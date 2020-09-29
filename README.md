@@ -8,7 +8,12 @@ In this moment the is no code to receive Jsons, just for now.
 <p></p>
 In terms of security, when you try to connect to the esp32 for the first time a LOGIN page apears and the login operation relies on SHA256 crypto. the hass pass is stored in the ESP32 memory. After the success login the ESP respond the HTML page that have all control possibilities.
 
+<h2>Login page</h2>
 ![login menu](img/login%20menu.png)
-
+<p></p>
+<h2>Schedule irrigation</h2>
+![login menu](img/login%20menu.png)
+<p></p>
+<h2></h2>
 
 

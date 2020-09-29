@@ -14,11 +14,18 @@ In terms of security, when you try to connect to the esp32 for the first time a 
 
 <p></p>
 
-<h2>Schedule irrigation</h2>
+<h2>Irrigation schedule</h2>
 
-![login menu](img/login%20menu.png)
+![irrigation](img/irrigatioSchedule.png)
 
 <p></p>
-<h2></h2>
 
+<h2>Manual activation</h2>
 
+![manual](img/manual%20activation.png)
+
+<p></p>
+
+<h2>Manual timer</h2>
+
+![timer](img/manualTimming.png)

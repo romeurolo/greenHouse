@@ -1,161 +1,18 @@
-<!DOCTYPE HTML>
-<html>
-
-<head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="description" content="" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
-        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
-
-    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 120px;
-            height: 68px
-        }
-
-        .switch input {
-            display: none
-        }
-
-        .slider {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            border-radius: 34px
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 52px;
-            width: 52px;
-            left: 8px;
-            bottom: 8px;
-            background-color: #fff;
-            -webkit-transition: .4s;
-            transition: .4s;
-            border-radius: 68px
-        }
-
-        input:checked+.slider {
-            background-color: #2196F3
-        }
-
-        input:checked+.slider:before {
-            -webkit-transform: translateX(52px);
-            -ms-transform: translateX(52px);
-            transform: translateX(52px)
-        }
-
-        .dotRed {
-            height: 25px;
-            width: 25px;
-            background-color: #f8041d;
-            ;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        .dotGreen {
-            height: 25px;
-            width: 25px;
-            background-color: #23bd47;
-            ;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        tbody {
-            display: block;
-            height: 750px;
-            overflow-y: scroll;
-        }
-
-        tr {
-            display: block;
-        }
-
-        th,
-        td {
-            width: 400px;
-        }
-    </style>
-</head>
-
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-sm-6 col-lg-6">
-                <h2>ESTUFA</h2>
-            </div>
-
-            <div class="col-sm-6 col-lg-6" id="connectionStatus">
-
-            </div>
-
-        </div>
-        <p></p>
-        <div class="row">
-            <div class="col-sm-3 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
-                    id="menumanualButtons">Modo
-                    Manual</button>
-            </div>
-            <div class="col-sm-3 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
-                    id="menucard1">Manual
-                    temporizado</button>
-            </div>
-
-            <div class="col-sm-3 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
-                    id="menutimerTable">Programar
-                    Relógio</button>
-            </div>
-            <div class="col-sm-3 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
-                    id="menucurrentState">Estado
-                    Actual</button>
-            </div>
-        </div>
-
-        <p></p>
-        <p></p>
-        <hr style="height:1px;background-color:black">
-        <div class="row" id="main">
-
-
-        </div>
-    </div>
-
-    <script>
-
-        function toggleCheckbox(element) {
+function toggleCheckbox(element) {
             var xhr = new XMLHttpRequest();
             if (element.checked) { xhr.open("GET", "/update?relay=" + element.id + "&state=1", true); }
             else { xhr.open("GET", "/update?relay=" + element.id + "&state=0", true); }
             xhr.send();
         }
-
         function checkSwitch() {
             $.ajax({
-                url: "http://192.168.1.87/json",
+                url: "http://192.168.1.81/json",
                 type: 'GET',
+                timeout: 1000,
                 dataType: 'json',
                 success: function (results) { processResults(null, results) },
                 error: function (request, statusText, httpError) { processResults(httpError || statusText), null }
             });
-
             function processResults(error, data) {
                 if (error) {
                     $("#connectionStatus").empty();
@@ -165,47 +22,22 @@
                             $("#" + e).attr("checked", false);
                         }
                     }
-                    $("td").each(function (index) {
-                        var estufa = String($(this).attr("id")).split(":")[1];
-                        var value = $(this).text();
-                        var data = String($(this).attr("id")).slice(9)
-
-                        if ($(this).text() == "REGAR") {
-                            for (var i = 0; i < greenHouseTimming[estufa - 1].length; i++) {     // parsing with array.length
-                                //console.log("estufa " + estufa + ": " + greenHouseTimming[estufa - 1][i]);
-                                if (greenHouseTimming[estufa - 1][i] == data) {
-                                    data = 0;
-                                    break;
-                                }
-                            }
-                            if (data != 0) {
-                                greenHouseTimming[estufa - 1].push(data);
-                            }
-
-                        }
-                        //console.log(String($(this).attr("id")).slice(9));
-                    });
                 }
 
                 if (data) {
                     $("#connectionStatus").empty();
                     $("#connectionStatus").append("<h2>ESP - Connected  <span class='dotGreen'></span> </h2>");
-                    console.log(data.digital)
+
 
                     for (var e = 1; e <= 4; e++) {
-                        console.log("Digital:" + e + "status:" + data.digital[e - 1])
                         if ($("#" + e).length == 1) {
-                            $("#" + e).attr("checked", data.digital[e - 1]);
+                            $("#" + e).attr("checked", Boolean(data.digital[e - 1]));
+
                         }
                     }
                 }
             }
-
-
-
-
         }
-
         function menuChange(element) {
             $("#main").empty();
             if (String(element.id).slice(4) == "timerTable") {
@@ -222,6 +54,8 @@
             }
         }
 
+
+
         function stopTimer(element) {
             var cardId = element.id.slice(9);
             countDownDate[cardId - 1] = new Date().getTime();
@@ -230,26 +64,21 @@
             $("#card" + cardId + "Body").attr("style", "background-color:Red;");
 
         }
-
         function startTimer(element) {
             var cardId = element.id.slice(10);
             countDownDate[cardId - 1] = addMinutes(new Date(), $("#timerValue" + cardId).val());
         }
-
         function addMinutes(date, minutes) {
             return new Date(date.getTime() + minutes * 60000);
         }
-
         setInterval(checkSwitch, 750)
         setInterval(timer, 1000)
-
         // Update the count down every 1 second
         function timer() {
             if ($("#cards").length) {
                 // Get today's date and time
                 var now = new Date().getTime();
                 for (var t = 1; t <= 4; t++) {
-
                     // Find the distance between now and the count down date
                     distance[t - 1] = countDownDate[t - 1] - now;
                     // Time calculations minutes and seconds
@@ -273,6 +102,7 @@
                 }
             }
         }
+
         function saveSchedule() {
 
         }
@@ -295,11 +125,9 @@
                 + "</tbody >"
                 + "</table >"
                 + "</div > "
-                + "<div class='col-sm-12 col-lg-12 text-center'>"
-                + "<button type='button' onclick='saveSchedule()' class='btn btn-lg btn-primary mx-auto'"
-                + "id = 'buttonSaveSchedule' > Salvar temporização</button >"
-                + "</div>";
-
+                + "<button type='button' onclick='saveSchedule()'"
+                + "class='btn btn-lg btn-primary mx-auto' id='buttonSaveSchedule'>"
+                + " Salvar temporização</button>";
 
             function createRows() {
                 var rowHTML = "";
@@ -331,7 +159,6 @@
 
         function manualButtons() {
             var buttons = "<div class='col-sm-12 col-lg-12 text-center' id='manualButtons'>";
-
             for (var i = 1; i <= 4; i++) {
                 buttons += "<h4>Relay #" + i + " - GPIO " + "</h4>"
                     + "<label class='switch'><input type='checkbox' onchange='toggleCheckbox(this)'"
@@ -352,9 +179,9 @@
         }
 
         function createCard(number) {
-            var card = "<div class='col-sm-12 col-lg-6'>";
 
-            card += "<div class='card m-3' id='card" + number + "'> "
+            var card = "<div class='col-sm-12 col-lg-6'>"
+                + "<div class='card m-3' id='card" + number + "'> "
                 + "<div class='card-body' style='background-color: Red;' id='card" + number + "Body'> "
                 + "<h2 class='card-title text-center'>ESTUFA " + number + "</h2>"
                 + "<p class='card-text text-center' id='countdown" + number + "'>REGA PARADA</p>"
@@ -376,24 +203,18 @@
                 + "<button type='button' onclick='stopTimer(this)' class='btn btn-lg btn-danger' "
                 + "id='timerStop" + number + "'>Parar Rega</button>"
                 + "</div>"
+                + "</div>"
                 + "</div>";
 
-            card += "</div>";
             return card;
         }
 
-        var countDownDate = [0, 0, 0, 0];
-        var distance = [0, 0, 0, 0];
-        var minutes = [0, 0, 0, 0];
-        var seconds = [0, 0, 0, 0];
-        var estufa1 = [];
-        var estufa2 = [];
-        var estufa3 = [];
-        var estufa4 = [];
+        var countDownDate=[0, 0, 0, 0];
+        var distance=[0, 0, 0, 0];
+        var minutes=[0, 0, 0, 0];
+        var seconds=[0, 0, 0, 0];
+        var estufa1=[];
+        var estufa2=[];
+        var estufa3=[];
+        var estufa4=[];
         var greenHouseTimming = [estufa1, estufa2, estufa3, estufa4];
-
-    </script>
-
-</body>
-
-</html>

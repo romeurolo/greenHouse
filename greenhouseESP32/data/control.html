@@ -1,0 +1,148 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="description" content="" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script type="text/javascript" src="min.js"></script>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 120px;
+            height: 68px
+        }
+
+        .switch input {
+            display: none
+        }
+
+        .slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            border-radius: 34px
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 52px;
+            width: 52px;
+            left: 8px;
+            bottom: 8px;
+            background-color: #fff;
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 68px
+        }
+
+        input:checked+.slider {
+            background-color: #2196F3
+        }
+
+        input:checked+.slider:before {
+            -webkit-transform: translateX(52px);
+            -ms-transform: translateX(52px);
+            transform: translateX(52px)
+        }
+
+        .dotRed {
+            height: 25px;
+            width: 25px;
+            background-color: #f8041d;
+            ;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dotGreen {
+            height: 25px;
+            width: 25px;
+            background-color: #23bd47;
+            ;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        tbody {
+            display: block;
+            height: 750px;
+            overflow-y: scroll;
+        }
+
+        tr {
+            display: block;
+        }
+
+        th,
+        td {
+            width: 400px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-sm-6 col-lg-6">
+                <h2>ESTUFA</h2>
+            </div>
+
+            <div class="col-sm-6 col-lg-6" id="connectionStatus">
+
+            </div>
+
+        </div>
+        <p></p>
+        <div class="row">
+            <div class="col-sm-3 col-lg-3 text-center">
+                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
+                    id="menumanualButtons">Modo
+                    Manual</button>
+            </div>
+            <div class="col-sm-3 col-lg-3 text-center">
+                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
+                    id="menucard1">Manual
+                    temporizado</button>
+            </div>
+
+            <div class="col-sm-3 col-lg-3 text-center">
+                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
+                    id="menutimerTable">Programar
+                    Relógio</button>
+            </div>
+            <div class="col-sm-3 col-lg-3 text-center">
+                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
+                    id="menucurrentState">Estado
+                    Actual</button>
+            </div>
+        </div>
+
+        <p></p>
+        <p></p>
+        <hr style="height:1px;background-color:black">
+        <div class="row" id="main">
+
+
+        </div>
+    </div>
+
+    <script>
+
+
+
+    </script>
+
+</body>

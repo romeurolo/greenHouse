@@ -5,6 +5,7 @@
 #include "AsyncJson.h"
 #include "ArduinoJson.h"
 #include "time.h"
+#include "SPIFFS.h"
 
 
 
@@ -54,7 +55,8 @@ const char index_html[] PROGMEM = R"rawliteral(
         integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
 
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-    <script src="https://192.168.1.65/js/min.js"></script>
+    <script type="text/javascript" src="min.js"></script>
+
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         .switch {
@@ -121,7 +123,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         tbody {
             display: block;
-            height: 500px;
+            height: 750px;
             overflow-y: scroll;
         }
 
@@ -142,27 +144,32 @@ const char index_html[] PROGMEM = R"rawliteral(
             <div class="col-sm-6 col-lg-6">
                 <h2>ESTUFA</h2>
             </div>
+
             <div class="col-sm-6 col-lg-6" id="connectionStatus">
+
             </div>
+
         </div>
         <p></p>
         <div class="row">
-            <div class="col-xs-6 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary"
+            <div class="col-sm-3 col-lg-3 text-center">
+                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
                     id="menumanualButtons">Modo
                     Manual</button>
             </div>
-            <div class="col-xs-6 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary" id="menucard1">Manual
+            <div class="col-sm-3 col-lg-3 text-center">
+                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
+                    id="menucard1">Manual
                     temporizado</button>
             </div>
-            <div class="col-xs-6 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary"
+
+            <div class="col-sm-3 col-lg-3 text-center">
+                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
                     id="menutimerTable">Programar
                     Relógio</button>
             </div>
-            <div class="col-xs-6 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary"
+            <div class="col-sm-3 col-lg-3 text-center">
+                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
                     id="menucurrentState">Estado
                     Actual</button>
             </div>
@@ -172,293 +179,21 @@ const char index_html[] PROGMEM = R"rawliteral(
         <p></p>
         <hr style="height:1px;background-color:black">
         <div class="row" id="main">
-        </div>
-    </div>
-  
-  
-</body>
-</html>
-)rawliteral";
 
-
-const char javaScript[] PROGMEM = R"rawliteral(
-function toggleCheckbox(element) {
-            var xhr = new XMLHttpRequest();
-            if (element.checked) { xhr.open("GET", "/update?relay=" + element.id + "&state=1", true); }
-            else { xhr.open("GET", "/update?relay=" + element.id + "&state=0", true); }
-            xhr.send();
-        }
-        function checkSwitch() {
-            $.ajax({
-                url: "http://192.168.1.81/json",
-                type: 'GET',
-                timeout: 1000,
-                dataType: 'json',
-                success: function (results) { processResults(null, results) },
-                error: function (request, statusText, httpError) { processResults(httpError || statusText), null }
-            });
-            function processResults(error, data) {
-                if (error) {
-                    $("#connectionStatus").empty();
-                    $("#connectionStatus").append("<h2>ESP - Disconected  <span class='dotRed'></span> </h2>");
-                    for (var e = 1; e <= 4; e++) {
-                        if ($("#" + e).length == 1) {
-                            $("#" + e).attr("checked", false);
-                        }
-                    }
-                }
-
-                if (data) {
-                    $("#connectionStatus").empty();
-                    $("#connectionStatus").append("<h2>ESP - Connected  <span class='dotGreen'></span> </h2>");
-
-
-                    for (var e = 1; e <= 4; e++) {
-                        if ($("#" + e).length == 1) {
-                            $("#" + e).attr("checked", Boolean(data.digital[e - 1]));
-
-                        }
-                    }
-                }
-            }
-        }
-        function menuChange(element) {
-            $("#main").empty();
-            if (String(element.id).slice(4) == "timerTable") {
-                $("#main").append(timerTable());
-            }
-            if (String(element.id).slice(4) == "card1") {
-                $("#main").append(cards());
-            }
-            if (String(element.id).slice(4) == "manualButtons") {
-                $("#main").append(manualButtons());
-            }
-            if (String(element.id).slice(4) == "currentState") {
-                //$("#main").append(manualButtons());
-            }
-        }
-
-
-
-        function stopTimer(element) {
-            var cardId = element.id.slice(9);
-            countDownDate[cardId - 1] = new Date().getTime();
-            $("#timerStart" + cardId).attr("disabled", false);
-            $("#timerValue" + cardId).attr("disabled", false);
-            $("#card" + cardId + "Body").attr("style", "background-color:Red;");
-
-        }
-        function startTimer(element) {
-            var cardId = element.id.slice(10);
-            countDownDate[cardId - 1] = addMinutes(new Date(), $("#timerValue" + cardId).val());
-        }
-        function addMinutes(date, minutes) {
-            return new Date(date.getTime() + minutes * 60000);
-        }
-        setInterval(checkSwitch, 750)
-        setInterval(timer, 1000)
-        // Update the count down every 1 second
-        function timer() {
-            if ($("#cards").length) {
-                // Get today's date and time
-                var now = new Date().getTime();
-                for (var t = 1; t <= 4; t++) {
-                    // Find the distance between now and the count down date
-                    distance[t - 1] = countDownDate[t - 1] - now;
-                    // Time calculations minutes and seconds
-                    minutes[t - 1] = Math.floor((distance[t - 1] % (1000 * 60 * 60)) / (1000 * 60));
-                    seconds[t - 1] = Math.floor((distance[t - 1] % (1000 * 60)) / 1000);
-                    // Output the result in an element with id="countdown"
-                    document.getElementById("countdown" + t).innerHTML = minutes[t - 1] + "m " + seconds[t - 1] + "s ";
-                    // If the count down is over, write some text 
-                    $("#card" + t + "Body").attr("style", "background-color:MediumSeaGreen;");
-                    if (distance[t - 1] < 0) {
-                        $("#timerStart" + t).attr("disabled", false);
-                        $("#timerValue" + t).attr("disabled", false);
-                        $("#card" + t + "Body").attr("style", "background-color:Red;");
-                        document.getElementById("countdown" + t).innerHTML = "REGA PARADA";
-                    }
-                    else {
-                        $("#card" + t + "Body").attr("style", "background-color:MediumSeaGreen;");
-                        $("#timerStart" + t).attr("disabled", true);
-                        $("#timerValue" + t).attr("disabled", true);
-                    }
-                }
-            }
-        }
-
-        function saveSchedule() {
-
-        }
-
-        function timerTable() {
-            var tableHTML =
-                "<div class='col-sm-12 col-lg-12 mx-my-5' id='timerTable'>"
-                + "<table class='table table-bordered'>"
-                + "<thead class='thead-dark'>"
-                + "<tr>"
-                + "<th scope='col' style='text-align:center'>Hora</th>"
-                + "<th scope='col' style='text-align:center'>Estufa 1 </th>"
-                + "<th scope='col' style='text-align:center'>Estufa 2</th>"
-                + "<th scope='col' style='text-align:center'>Estufa 3</th>"
-                + "<th scope='col' style='text-align:center'>Estufa 4</th>"
-                + "</tr>"
-                + "</thead>"
-                + "<tbody>"
-                + createRows()
-                + "</tbody >"
-                + "</table >"
-                + "</div > "
-                + "<button type='button' onclick='saveSchedule()'"
-                + "class='btn btn-lg btn-primary mx-auto' id='buttonSaveSchedule'>"
-                + " Salvar temporização</button>";
-
-            function createRows() {
-                var rowHTML = "";
-
-                for (var h = 0; h < 24; h++) {
-                    for (var m = 0; m < 50; m = m + 15) {
-                        rowHTML = rowHTML + ("<tr>"
-                            + "<th class='table-dark' scope='row' style='text-align:center'>" + h + "H " + m + "m</th>"
-                            + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='estufa:1:" + h + ":" + m + "'></td>"
-                            + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='estufa:2:" + h + ":" + m + "'></td>"
-                            + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='estufa:3:" + h + ":" + m + "'></td>"
-                            + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='estufa:4:" + h + ":" + m + "'></td>"
-                            + "</tr>");
-                    }
-                }
-                return rowHTML;
-            }
-            return tableHTML;
-        }
-
-        function toggleSchedule(form) {
-            form.classList.toggle("bg-success");
-            if (form.innerHTML === "REGAR") {
-                form.innerHTML = "";
-            } else {
-                form.innerHTML = "REGAR";
-            }
-        }
-
-        function manualButtons() {
-            var buttons = "<div class='col-sm-12 col-lg-12 text-center' id='manualButtons'>";
-            for (var i = 1; i <= 4; i++) {
-                buttons += "<h4>Relay #" + i + " - GPIO " + "</h4>"
-                    + "<label class='switch'><input type='checkbox' onchange='toggleCheckbox(this)'"
-                    + "id='" + i + "''>"
-                    + "<span class='slider'></span></label>";
-            }
-            buttons += "</div>";
-            return buttons;
-        }
-
-        function cards() {
-            var cards = "<div class='row' id='cards'>";
-            for (var xcard = 1; xcard <= 4; xcard++) {
-                cards += createCard(xcard);
-            }
-            cards += "</div>";
-            return cards;
-        }
-
-        function createCard(number) {
-
-            var card = "<div class='col-sm-12 col-lg-6'>"
-                + "<div class='card m-3' id='card" + number + "'> "
-                + "<div class='card-body' style='background-color: Red;' id='card" + number + "Body'> "
-                + "<h2 class='card-title text-center'>ESTUFA " + number + "</h2>"
-                + "<p class='card-text text-center' id='countdown" + number + "'>REGA PARADA</p>"
-                + "</div>"
-                + "<ul class='list-group list-group - flush' style='background-color: DodgerBlue; '>"
-                + "<li class='list-group-item' style='background-color: rgb(0, 186, 255); '>"
-                + "<div class='form-group' style='background-color: rgb(0, 186, 255); '>"
-                + "<label for='exampleFormControlSelect" + number + "'>Tempo de rega 'MINUTOS'</label>"
-                + "<select class='form-control' id='timerValue" + number + "' name='valueTimerValue'>"
-                + "<option>5</option><option>10</option><option>15</option>"
-                + "<option>20</option><option>25</option><option>30</option>"
-                + "</select>"
-                + "</div>"
-                + "</li>"
-                + "</ul>"
-                + "<div class='card-body' style='background-color: rgb(0, 186, 255); '>"
-                + "<button type='button' onclick='startTimer(this)' class='btn btn-lg btn-success'"
-                + " id='timerStart" + number + "'>Começar Rega</button > "
-                + "<button type='button' onclick='stopTimer(this)' class='btn btn-lg btn-danger' "
-                + "id='timerStop" + number + "'>Parar Rega</button>"
-                + "</div>"
-                + "</div>"
-                + "</div>";
-
-            return card;
-        }
-
-        var countDownDate=[0, 0, 0, 0];
-        var distance=[0, 0, 0, 0];
-        var minutes=[0, 0, 0, 0];
-        var seconds=[0, 0, 0, 0];
-        var estufa1=[];
-        var estufa2=[];
-        var estufa3=[];
-        var estufa4=[];
-        var greenHouseTimming = [estufa1, estufa2, estufa3, estufa4];
-)rawliteral";
-
-const char loginIndex[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML>
-<html>
-
-<head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
-        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.min.js"></script>
-
-    <title>ESTUFAS</title>
-</head>
-
-<body>
-
-    <div class="card mx-auto" style="width: 18rem;">
-        <div class="card-body">
-            <h5 class="card-title">ESTUFAS JORGE ROLO</h5>
-            <form name="loginForm">
-                <div class="form-group">
-                    <label for="exampleInputEmail1">Username</label>
-                    <input type="text" class="form-control" id="Username" name="userid">
-                </div>
-                <div class="form-group">
-                    <label for="exampleInputPassword1">Password</label>
-                    <input type="password" class="form-control" id="password" name="pwd">
-                </div>
-                <button type="button" onclick="check(this.form)" class="btn btn-success btn-lg">Login</button>
-            </form>
 
         </div>
     </div>
 
-    </div>
     <script>
-        function check(form) {
-            var hash = CryptoJS.SHA256(form.pwd.value);
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", "/update?username=" + form.userid.value + "&password=" + hash, true);
-            xhr.send();
-            setTimeout(() => { window.location.reload(); }, 500);
-        }
+
+
+
     </script>
+
 </body>
 
 </html>
 )rawliteral";
-
-
-
 
 // -----------------------separation html side ----------------------
 
@@ -482,18 +217,6 @@ String relayState(int numRelay){
   return "";
 }
 
-// Replaces placeholder with button section in your web page
-  String processor(const String& var){
-    //Serial.println(var);
-    if(var == "BUTTONPLACEHOLDER"){
-      String buttons =javaScript;
-
-      
-      return buttons;
-    }
-    return String();
-  }
-
 void printLocalTime()
 {
   struct tm timeinfo;
@@ -507,6 +230,12 @@ void printLocalTime()
 void setup(){
   // Serial port for debugging purposes
   Serial.begin(115200);
+
+    // Initialize SPIFFS
+  if(!SPIFFS.begin(true)){
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+  }
 
   // Set all relays to off when the program starts - if set to Normally Open (NO), the relay is off when you set the relay to HIGH
   for(int i=1; i<=NUM_RELAYS; i++){
@@ -535,17 +264,16 @@ void setup(){
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
    
     if(logedIn){
-      request->send_P(200, "text/html", index_html);
+       request->send(SPIFFS, "/control.html","text/html");
       }
       else{
-         request->send_P(200, "text/html", loginIndex);
+         request->send(SPIFFS, "/indexlogin.html","text/html");
         }       
   });
-  server.on("/js", HTTP_GET, [](AsyncWebServerRequest *request){
-   
-      request->send_P(200, "text/javascript", javaScript);
-      
-  });
+  
+  server.on("/min.js", HTTP_GET, [](AsyncWebServerRequest *request){
+  request->send(SPIFFS, "/min.js","text/javascript");
+});
 
   server.on("/json", HTTP_GET, [](AsyncWebServerRequest *request){
 long duration = millis();
@@ -621,6 +349,7 @@ long duration = millis();
   });
   // Start server
   server.begin();
+   
 }
   
 void loop() {

@@ -6,8 +6,7 @@
 #include "ArduinoJson.h"
 #include "time.h"
 #include "SPIFFS.h"
-
-
+#include "Update.h"
 
 // Set to true to define Relay as Normally Open (NO)
 #define RELAY_NO    true
@@ -18,6 +17,9 @@
 // Assign each GPIO to a relay
 int relayGPIOs[NUM_RELAYS] = {2, 26, 27, 25, 33};
 int relaySTATE[NUM_RELAYS] = {false, false, false, false, false,};
+long relayTimers[NUM_RELAYS] ={0,0,0,0,0};
+String schedule="";
+
 
 // Replace with your network credentials
 const char* ssid = "Cervejaria_Imperial";
@@ -41,159 +43,6 @@ AsyncWebServer server(80);
 
 // Create Json document
 StaticJsonDocument<500> doc;
-
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML>
-<html>
-
-<head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="description" content="" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
-        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
-
-    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-    <script type="text/javascript" src="min.js"></script>
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 120px;
-            height: 68px
-        }
-
-        .switch input {
-            display: none
-        }
-
-        .slider {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            border-radius: 34px
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 52px;
-            width: 52px;
-            left: 8px;
-            bottom: 8px;
-            background-color: #fff;
-            -webkit-transition: .4s;
-            transition: .4s;
-            border-radius: 68px
-        }
-
-        input:checked+.slider {
-            background-color: #2196F3
-        }
-
-        input:checked+.slider:before {
-            -webkit-transform: translateX(52px);
-            -ms-transform: translateX(52px);
-            transform: translateX(52px)
-        }
-
-        .dotRed {
-            height: 25px;
-            width: 25px;
-            background-color: #f8041d;
-            ;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        .dotGreen {
-            height: 25px;
-            width: 25px;
-            background-color: #23bd47;
-            ;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        tbody {
-            display: block;
-            height: 750px;
-            overflow-y: scroll;
-        }
-
-        tr {
-            display: block;
-        }
-
-        th,
-        td {
-            width: 400px;
-        }
-    </style>
-</head>
-
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-sm-6 col-lg-6">
-                <h2>ESTUFA</h2>
-            </div>
-
-            <div class="col-sm-6 col-lg-6" id="connectionStatus">
-
-            </div>
-
-        </div>
-        <p></p>
-        <div class="row">
-            <div class="col-sm-3 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
-                    id="menumanualButtons">Modo
-                    Manual</button>
-            </div>
-            <div class="col-sm-3 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
-                    id="menucard1">Manual
-                    temporizado</button>
-            </div>
-
-            <div class="col-sm-3 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
-                    id="menutimerTable">Programar
-                    Relógio</button>
-            </div>
-            <div class="col-sm-3 col-lg-3 text-center">
-                <button type="button" onclick="menuChange(this)" class="btn btn-lg btn-primary mx-auto"
-                    id="menucurrentState">Estado
-                    Actual</button>
-            </div>
-        </div>
-
-        <p></p>
-        <p></p>
-        <hr style="height:1px;background-color:black">
-        <div class="row" id="main">
-
-
-        </div>
-    </div>
-
-    <script>
-
-
-
-    </script>
-
-</body>
-
-</html>
-)rawliteral";
 
 // -----------------------separation html side ----------------------
 
@@ -275,17 +124,43 @@ void setup(){
   request->send(SPIFFS, "/min.js","text/javascript");
 });
 
+ server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request){
+  request->send(SPIFFS, "/favicon.ico","image/x-icon");
+});
+
+ server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
+  request->send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+    //ESP.restart();
+    //Check if parameter exists (Compatibility)
+int args = request->args();
+for(int i=0;i<args;i++){
+  Serial.printf("ARG[%s]: %s\n", request->argName(i).c_str(), request->arg(i));
+}
+
+if(request->hasArg("download")){
+  String arg = request->arg("download");
+Serial.println(arg);
+ }
+  });
+  
+
+
+
   server.on("/json", HTTP_GET, [](AsyncWebServerRequest *request){
 long duration = millis();
    JsonArray digitalValues = doc.createNestedArray("digital");
+   JsonArray timerValues = doc.createNestedArray("manualTimers");
+   JsonArray scheduleValues = doc.createNestedArray("scheduleValues");
    String jsonOutput;
   for (int pin = 0; pin < NUM_RELAYS; pin++) { 
     // Read the digital input
     int value = relaySTATE[pin];
+    int timerValue = relayTimers[pin];
     // Add the value at the end of the array
     digitalValues.add(value);
+    timerValues.add(timerValues);
     }
-    
+    scheduleValues.add(schedule);
   serializeJson(doc, jsonOutput);
   
 // Length (with one extra character for the null terminator)

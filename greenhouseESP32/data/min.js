@@ -4,34 +4,36 @@ function toggleCheckbox(element) {
     else { xhr.open("GET", "/update?relay=" + element.id + "&state=0", true); }
     xhr.send();
 }
-function checkSwitch() {
+function checkSwitch(cb1, cb2) {
     $.ajax({
-        url: "http://192.168.1.81/json",
+        url: "/json",
         type: 'GET',
         timeout: 1000,
         dataType: 'json',
-        success: function (results) { processResults(null, results) },
-        error: function (request, statusText, httpError) { processResults(httpError || statusText), null }
+        success: function (results) { cb1(null, results, cb2) },
+        error: function (request, statusText, httpError) { cb1(httpError || statusText, cb2), null }
     });
-    function processResults(error, data) {
-        if (error) {
-            $("#connectionStatus").empty();
-            $("#connectionStatus").append("<h2>ESP - Disconected  <span class='dotRed'></span> </h2>");
-            for (var e = 1; e <= 4; e++) {
-                if ($("#" + e).length == 1) {
-                    $("#" + e).attr("checked", false);
-                }
+}
+
+function processResults(error, data, cb) {
+    if (error) {
+        $("#connectionStatus").empty();
+        $("#connectionStatus").append("<h2>ESP - Disconected  <span class='dotRed'></span> </h2>");
+        for (var e = 1; e <= 4; e++) {
+            if ($("#" + e).length == 1) {
+                $("#" + e).attr("checked", false);
             }
         }
+    }
 
-        if (data) {
-            $("#connectionStatus").empty();
-            $("#connectionStatus").append("<h2>ESP - Connected  <span class='dotGreen'></span> </h2>");
-            for (var e = 1; e <= 4; e++) {
-                if ($("#" + e).length == 1) {
-                    $("#" + e).attr("checked", Boolean(data.digital[e - 1]));
+    if (data) {
+        console.log(data);
+        $("#connectionStatus").empty();
+        $("#connectionStatus").append("<h2>ESP - Connected  <span class='dotGreen'></span> </h2>");
+        for (var e = 1; e <= 4; e++) {
+            if ($("#" + e).length == 1) {
+                $("#" + e).attr("checked", Boolean(data.digital[e - 1]));
 
-                }
             }
         }
     }
@@ -50,6 +52,9 @@ function menuChange(element) {
     }
     if (String(element.id).slice(4) == "currentState") {
         //$("#main").append(manualButtons());
+    }
+    if (String(element.id).slice(4) == "Update") {
+        $("#main").append(createUpdate());
     }
 }
 
@@ -71,7 +76,7 @@ function addMinutes(date, minutes) {
     return new Date(date.getTime() + minutes * 60000);
 }
 
-// Update the count down every 1 second
+// Update the count in the cards
 function timer() {
     if ($("#cards").length) {
         // Get today's date and time
@@ -102,7 +107,18 @@ function timer() {
 }
 
 function saveSchedule() {
-  
+    //Clean the list everytime function is called
+    scheduleList.forEach(function (value) {
+        scheduleList.delete(value);
+    });
+    //Add the id to the list if is selected, if the value has been added, the set dont repeat the entry' 
+    $("td").each(function (index) {
+        if ($(this).text() == "REGAR") {
+            scheduleList.add($(this).attr("id"));
+        }
+
+    });
+    console.log(scheduleList);
 }
 
 function timerTable() {
@@ -158,7 +174,7 @@ function toggleSchedule(form) {
 function manualButtons() {
     var buttons = "<div class='col-sm-12 col-lg-12 text-center' id='manualButtons'>";
     for (var i = 1; i <= 4; i++) {
-        buttons += "<h4>Relay #" + i + " - GPIO " + "</h4>"
+        buttons += "<h4>ESTUFA " + i + "</h4>"
             + "<label class='switch'><input type='checkbox' onchange='toggleCheckbox(this)'"
             + "id='" + i + "'>"
             + "<span class='slider'></span></label>";
@@ -207,15 +223,75 @@ function createCard(number) {
     return card;
 }
 
-setInterval(checkSwitch, 750);
+function createUpdate() {
+    var updateCard = "<div class='row justify-content-center' id='updateCard'>" +
+        "<div class='col-sm-12 col-lg-12 text-center'>" +
+        "<div class='card m-3' style='width: 25rem;'>" +
+        "<div class='card-body'>" +
+        "<h5 class='card-title text-center'>Update software</h5>" +
+        "<p class='card-text' id = 'prg' > progress: 0 %</p > " +
+        "<div class='progress' > " +
+        "<div class='progress-bar progress-bar-striped bg-success' role = 'progressbar'" +
+        "style = 'width: 0%' aria - valuenow='25' aria - valuemin='0' aria - valuemax='100' id = 'prgBar' ></div > " +
+        "</div > " +
+        "</div > " +
+        "<form method = 'POST' action = '#' enctype = 'multipart/form-data' id = 'upload_form' > " +
+        "<ul class='list-group list-group-flush' > " +
+        "<li class='list-group-item' > " +
+        "<input class='form-control-file ' type = 'file' name = 'update' > " +
+        "</li > " +
+        "<li class='list-group-item' > " +
+        "<button type='button' onclick='OTA()' class='btn btn-primary'>Update</button>" +
+        "</li > " +
+        "</ul > " +
+        "</form > " +
+        "</div > " +
+        "</div > " +
+        "</div >";
+
+    return updateCard;
+}
+
+function OTA() {
+    var form = $('#upload_form')[0];
+    var data = new FormData(form);
+    $.ajax({
+        url: '/update',
+        type: 'POST',
+        data: data,
+        contentType: false,
+        processData: false,
+        xhr: function () {
+            var xhr = new window.XMLHttpRequest();
+            xhr.upload.addEventListener('progress', function (evt) {
+                if (evt.lengthComputable) {
+                    var per = evt.loaded / evt.total;
+                    $('#prg').html('progress: ' + Math.round(per * 100) + '%');
+                    //console.log(String($('#prgBar').attr('style')));
+                    $('#prgBar').attr('style', "width: " + Math.round(per * 100) + "%");
+                }
+            }, false);
+            return xhr;
+        },
+        success: function (d, s) {
+            console.log('success!');
+        },
+        error: function (a, b, c) {
+            console.log('Error!');
+        }
+    });
+}
+
+setInterval(checkSwitch(processResults), 750);
 setInterval(timer, 1000);
 
-var countDownDate=[0, 0, 0, 0];
-var distance=[0, 0, 0, 0];
-var minutes=[0, 0, 0, 0];
-var seconds=[0, 0, 0, 0];
-var estufa1=[];
-var estufa2=[];
-var estufa3=[];
-var estufa4=[];
+var countDownDate = [0, 0, 0, 0];
+var distance = [0, 0, 0, 0];
+var minutes = [0, 0, 0, 0];
+var seconds = [0, 0, 0, 0];
+var estufa1 = [];
+var estufa2 = [];
+var estufa3 = [];
+var estufa4 = [];
 var greenHouseTimming = [estufa1, estufa2, estufa3, estufa4];
+var scheduleList = new Set();

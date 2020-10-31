@@ -38,4 +38,11 @@ After Login the page have 5 menus. Actual state, manual mode, schedulle table, m
 
 ![ota](img/ota.png)
 
+<p></p>
+
+<h2>Access Point Mode</h2>
+
+![ota](img/apMode.png)
+
+
 

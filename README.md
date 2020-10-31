@@ -9,6 +9,8 @@ In this moment the is no code to receive Jsons, just for now.
 In terms of security, when you try to connect to the esp32 for the first time a LOGIN page apears and the login operation relies on SHA256 crypto. the hass pass is stored in the ESP32 memory. After the success login the ESP respond the HTML page that have all control possibilities.
 <p></p>
 After Login the page have 5 menus. Actual state, manual mode, schedulle table, manual timming and OTA. 
+<p></p>
+If there is no Wifi connection configuration or available, the ESP32 start the AP mode and response the APmode page where we can conncet to one of the available wifi scaned by the machine or manually enter the SSID and the password. After hit the save button the ESP will save the configuration and restart to normal mode.
 
 <h2>Login page</h2>
 

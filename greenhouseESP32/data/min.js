@@ -4,36 +4,38 @@ function toggleCheckbox(element) {
     else { xhr.open("GET", "/update?relay=" + element.id + "&state=0", true); }
     xhr.send();
 }
-function checkSwitch(cb1, cb2) {
+function jsonRequest(cb1, cb2) {
     $.ajax({
         url: "/json",
+        timeout: 2000,
         type: 'GET',
-        timeout: 1000,
         dataType: 'json',
-        success: function (results) { cb1(null, results, cb2) },
-        error: function (request, statusText, httpError) { cb1(httpError || statusText, cb2), null }
+        success: function (results) {
+            cb1(null, results, cb2);
+            $("#connectionStatus").empty();
+            $("#connectionStatus").append("<a class='nav-link disabled'>Conected <span class='dotGreen'></span></a>");
+        },
+        error: function (request, statusText, httpError) {
+            cb1(httpError || statusText, cb2), null;
+            $("#connectionStatus").empty();
+            $("#connectionStatus").append("<a class='nav-link disabled'>Disconected <span class='dotRed'></span></a>");
+        }
     });
+
 }
 
 function processResults(error, data, cb) {
     if (error) {
-        $("#connectionStatus").empty();
-        $("#connectionStatus").append("<h2>ESP - Disconected  <span class='dotRed'></span> </h2>");
-        for (var e = 1; e <= 4; e++) {
-            if ($("#" + e).length == 1) {
-                $("#" + e).attr("checked", false);
-            }
+        if ($("#" + e).length == 1) {
+            $("#" + e).attr("checked", false);
         }
     }
 
+
     if (data) {
-        console.log(data);
-        $("#connectionStatus").empty();
-        $("#connectionStatus").append("<h2>ESP - Connected  <span class='dotGreen'></span> </h2>");
         for (var e = 1; e <= 4; e++) {
             if ($("#" + e).length == 1) {
                 $("#" + e).attr("checked", Boolean(data.digital[e - 1]));
-
             }
         }
     }
@@ -43,6 +45,7 @@ function menuChange(element) {
     $("#main").empty();
     if (String(element.id).slice(4) == "timerTable") {
         $("#main").append(timerTable());
+        jsonRequest(updateShedule);
     }
     if (String(element.id).slice(4) == "card1") {
         $("#main").append(cards());
@@ -66,14 +69,23 @@ function stopTimer(element) {
     $("#timerStart" + cardId).attr("disabled", false);
     $("#timerValue" + cardId).attr("disabled", false);
     $("#card" + cardId + "Body").attr("style", "background-color:Red;");
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/update?timer=" + cardId + "&date=0", true);
+    xhr.send();
 
 }
 function startTimer(element) {
     var cardId = element.id.slice(10);
     countDownDate[cardId - 1] = addMinutes(new Date(), $("#timerValue" + cardId).val());
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/update?timer=" + cardId + "&date=" + countDownDate[cardId - 1], true);
+    xhr.send();
+
 }
 function addMinutes(date, minutes) {
     return new Date(date.getTime() + minutes * 60000);
+
 }
 
 // Update the count in the cards
@@ -107,18 +119,20 @@ function timer() {
 }
 
 function saveSchedule() {
-    //Clean the list everytime function is called
-    scheduleList.forEach(function (value) {
-        scheduleList.delete(value);
-    });
+    var scheduleList = "";
+
     //Add the id to the list if is selected, if the value has been added, the set dont repeat the entry' 
     $("td").each(function (index) {
         if ($(this).text() == "REGAR") {
-            scheduleList.add($(this).attr("id"));
+            console.log(String($(this).attr("id")).split("E")[1]);
+            scheduleList = scheduleList + String($(this).attr("id"));
         }
-
     });
-    console.log(scheduleList);
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/update?timming=" + scheduleList, true);
+    xhr.send();
+
+
 }
 
 function timerTable() {
@@ -150,10 +164,10 @@ function timerTable() {
             for (var m = 0; m < 50; m = m + 15) {
                 rowHTML = rowHTML + ("<tr>"
                     + "<th class='table-dark' scope='row' style='text-align:center;'>" + h + "H " + m + "m</th>"
-                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='estufa:1:" + h + ":" + m + "'></td>"
-                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='estufa:2:" + h + ":" + m + "'></td>"
-                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='estufa:3:" + h + ":" + m + "'></td>"
-                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='estufa:4:" + h + ":" + m + "'></td>"
+                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:1:" + h + ":" + m + "'></td>"
+                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:2:" + h + ":" + m + "'></td>"
+                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:3:" + h + ":" + m + "'></td>"
+                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:4:" + h + ":" + m + "'></td>"
                     + "</tr>");
             }
         }
@@ -168,6 +182,19 @@ function toggleSchedule(form) {
         form.innerHTML = "";
     } else {
         form.innerHTML = "REGAR";
+    }
+}
+
+function updateShedule(error, data, cb) {
+    if (error) {
+    }
+
+    if (data && data.scheduleValues[0]) {
+        var schedule = data.scheduleValues[0].split("E");
+        for (var e = 1; e < schedule.length; e++) {
+            document.getElementById("E" + schedule[e]).classList.toggle("bg-success");
+            document.getElementById("E" + schedule[e]).innerHTML = "REGAR";
+        }
     }
 }
 
@@ -256,7 +283,7 @@ function OTA() {
     var form = $('#upload_form')[0];
     var data = new FormData(form);
     $.ajax({
-        url: '/update',
+        url: '/OTA',
         type: 'POST',
         data: data,
         contentType: false,
@@ -267,7 +294,6 @@ function OTA() {
                 if (evt.lengthComputable) {
                     var per = evt.loaded / evt.total;
                     $('#prg').html('progress: ' + Math.round(per * 100) + '%');
-                    //console.log(String($('#prgBar').attr('style')));
                     $('#prgBar').attr('style', "width: " + Math.round(per * 100) + "%");
                 }
             }, false);
@@ -275,6 +301,16 @@ function OTA() {
         },
         success: function (d, s) {
             console.log('success!');
+
+            setInterval(function () {
+                $('#prg').html('Rebooting: ' + rebootTime + '%');
+                $('#prgBar').attr('style', "width: " + rebootTime + "%");
+                rebootTime++;
+                if (rebootTime > 100) {
+                    clearTimeout(this);
+                    location.replace("/")
+                }
+            }, 100)
         },
         error: function (a, b, c) {
             console.log('Error!');
@@ -282,8 +318,10 @@ function OTA() {
     });
 }
 
-setInterval(checkSwitch(processResults), 750);
+setInterval(function () { if ($("#1").length == 1) { jsonRequest(processResults); } }, 550);
 setInterval(timer, 1000);
+document.getElementById("connectionStatus").addEventListener("load", jsonRequest(processResults));
+
 
 var countDownDate = [0, 0, 0, 0];
 var distance = [0, 0, 0, 0];
@@ -294,4 +332,4 @@ var estufa2 = [];
 var estufa3 = [];
 var estufa4 = [];
 var greenHouseTimming = [estufa1, estufa2, estufa3, estufa4];
-var scheduleList = new Set();
+var rebootTime = 0;

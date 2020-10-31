@@ -1,0 +1,86 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <title>ESTUFAS</title>
+</head>
+
+<body>
+    <h1 style="color:red;">Estufas Access Point mode</h1>
+    <form>
+        <label for="fname" id="formDiv">SSID:<br></label><br>
+        <select type="text" id="fname" name="ssid">
+        </select>
+        <label for="lname">Password:</label><br>
+        <input type="text" id="lname" name="pswd"><br><br>
+        <button type="button" onclick="check(this.form)">Save and connect</button>
+        <button type="button" onclick="jsonreq()">Refresh Wifi list</button>
+        <button type="button" onclick="manual()">Enter SSID manualy</button>
+    </form>
+
+    <p></p>
+    <p></p>
+
+    <script>
+        function check(form) {
+
+            if (form.ssid.value != "") {
+                var xhr = new XMLHttpRequest();
+                xhr.open("GET", "/update?ssid=" + form.ssid.value + "&password=" + form.pswd.value, true);
+                xhr.send();
+                //setTimeout(() => { window.location.reload(); }, 500);
+                alert("Please conect to wifi");
+            }
+            else {
+                alert("Please enter a valid SSID");
+            }
+        }
+        function jsonreq() {
+            var xmlhttp = new XMLHttpRequest();
+            var url = "/json?wifilist=true";
+
+            xmlhttp.onreadystatechange = function () {
+                document.getElementById("fname").remove();
+                var para = document.createElement("select");
+                para.id = "fname";
+                para.name = "ssid";
+                para.type = "text";
+                var node = document.createElement("br");
+                var element = document.getElementById("formDiv");
+                //element.appendChild(node);
+                element.appendChild(para);
+                var optionHTML = "<option value='empty'>No available Wifi connections</option>";
+                if (this.readyState == 4 && this.status == 200) {
+                    var myArr = JSON.parse(this.responseText);
+                    if (myArr.wifiList.length > 0) {
+                        optionHTML = "";
+                        for (var t = 0; t < myArr.wifiList.length; t++) {
+                            console.log(myArr.wifiList[t])
+                            optionHTML += "<option value='" + myArr.wifiList[t] + "'>" + myArr.wifiList[t] + "</option>";
+                        }
+                    }
+                }
+                document.getElementById("fname").innerHTML = optionHTML;
+            };
+            xmlhttp.open("GET", url, true);
+            xmlhttp.send();
+        }
+
+        function manual() {
+            document.getElementById("fname").remove();
+            var para = document.createElement("input");
+            para.id = "fname";
+            para.name = "ssid";
+            para.type = "text";
+            var node = document.createElement("br");
+            var element = document.getElementById("formDiv");
+            //element.appendChild(node);
+            element.appendChild(para);
+
+        }
+
+        document.getElementById("fname").addEventListener("load", jsonreq());
+    </script>
+</body>
+
+</html>

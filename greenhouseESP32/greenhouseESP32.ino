@@ -7,6 +7,9 @@
 #include "time.h"
 #include "SPIFFS.h"
 #include "Update.h"
+#include <EEPROM.h>
+
+
 
 // Set to true to define Relay as Normally Open (NO)
 #define RELAY_NO    true
@@ -14,21 +17,33 @@
 // Set number of relays
 #define NUM_RELAYS  5
 
+void writeString(char add,String data);
+String read_String(char add);
+
+
 // Assign each GPIO to a relay
 int relayGPIOs[NUM_RELAYS] = {2, 26, 27, 25, 33};
-int relaySTATE[NUM_RELAYS] = {false, false, false, false, false,};
+int relaySTATE[NUM_RELAYS] = {0,0,0,0,0};
 long relayTimers[NUM_RELAYS] ={0,0,0,0,0};
 String schedule="";
 
 
 // Replace with your network credentials
-const char* ssid = "Cervejaria_Imperial";
-const char* password = "";
+char ssid[32] ="";
+char password[32] ="";
+const char* host = "esp32";
+const char *ssidAP = "ESP32AP";
+const char *passwordAP = "";
 
 const char* PARAM_INPUT_1 = "relay";
 const char* PARAM_INPUT_2 = "state";
 const char* PARAM_INPUT_3 = "username";
 const char* PARAM_INPUT_4 = "password";
+const char* PARAM_INPUT_5 = "timming";
+const char* PARAM_INPUT_6 = "timer";
+const char* PARAM_INPUT_7 = "date";
+
+
 const char* PASSHASH = "4a7f6f76bbe95876c2fde2d8693ed8c3aca8d5a85a0df6e7cb0fd7b2751be915";
 const char* ROOTUSER = "romeurolo";
 bool logedIn = false;
@@ -36,49 +51,33 @@ long timermillis = 0;
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 0;
 const int   daylightOffset_sec = 3600;
-
+bool shouldReboot = false;
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
+// create sever to connect if no network
+//WiFiServer serverAP(80);
+
+
+
 // Create Json document
-StaticJsonDocument<500> doc;
+DynamicJsonDocument doc(4096);
 
 // -----------------------separation html side ----------------------
-
-String relayState(int numRelay){
-  if(RELAY_NO){
-    if(digitalRead(relayGPIOs[numRelay-1])){
-      return "";
-    }
-    else {
-      return "checked";
-    }
-  }
-  else {
-    if(digitalRead(relayGPIOs[numRelay-1])){
-      return "checked";
-    }
-    else {
-      return "";
-    }
-  }
-  return "";
-}
-
-void printLocalTime()
-{
-  struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-    return;
-  }
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-}
 
 void setup(){
   // Serial port for debugging purposes
   Serial.begin(115200);
+  EEPROM.begin(512);
+//-------------------------Read ssid and wifi password from EEPROM----------------
+String copy;
+copy = read_String(10);
+copy.toCharArray(ssid, 42);
+//copy = read_String(100);
+//copy.toCharArray(password, 110);
+ 
+  
 
     // Initialize SPIFFS
   if(!SPIFFS.begin(true)){
@@ -101,66 +100,100 @@ void setup(){
   
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  int atempt = 0;
+ 
+  while (WiFi.status() != WL_CONNECTED && atempt <10) { 
     delay(1000);
+    atempt++;
     Serial.println("Connecting to WiFi..");
-  }
+  }  
+    
+  if(WiFi.status() != WL_CONNECTED){
+    WiFi.disconnect();
+    Serial.println("Fail to connect to WiFi, Start AP mode");
+   WiFi.softAP(ssidAP, passwordAP);
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+  Serial.println("Server started");
+    }
+
 
   // Print ESP32 Local IP Address
   Serial.println(WiFi.localIP());
 
+if(WiFi.status() == WL_CONNECTED){
+  //Setting RTC
+   //printLocalTime();
+   //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+   //printLocalTime();
+}
+  
+
+//-------------------------------Response to main page------------------------
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
    
-    if(logedIn){
+    if(logedIn && WiFi.status() == WL_CONNECTED){
        request->send(SPIFFS, "/control.html","text/html");
       }
-      else{
+      else if(!logedIn && WiFi.status() == WL_CONNECTED){
          request->send(SPIFFS, "/indexlogin.html","text/html");
         }       
+        else{
+          request->send(SPIFFS, "/indexAP.html","text/html");
+          }
   });
   
+  //-------------------------------Response to javascript------------------------
   server.on("/min.js", HTTP_GET, [](AsyncWebServerRequest *request){
   request->send(SPIFFS, "/min.js","text/javascript");
 });
 
- server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request){
-  request->send(SPIFFS, "/favicon.ico","image/x-icon");
-});
-
- server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
-  request->send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-    //ESP.restart();
-    //Check if parameter exists (Compatibility)
-int args = request->args();
-for(int i=0;i<args;i++){
-  Serial.printf("ARG[%s]: %s\n", request->argName(i).c_str(), request->arg(i));
-}
-
-if(request->hasArg("download")){
-  String arg = request->arg("download");
-Serial.println(arg);
- }
+//-------------------------------Response to OTA Update------------------------
+  
+  server.on("/OTA", HTTP_POST, [](AsyncWebServerRequest *request){
+    shouldReboot = !Update.hasError();
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot?"OK":"FAIL");
+    response->addHeader("Connection", "close");
+    request->send(response);
+  },[](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+    if(!index){
+      Serial.printf("Update Start: %s\n", filename.c_str());
+      //Update.runAsync(true);
+      if(!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000)){
+        Update.printError(Serial);
+      }
+    }
+    if(!Update.hasError()){
+      if(Update.write(data, len) != len){
+        Update.printError(Serial);
+      }
+    }
+    if(final){
+      if(Update.end(true)){
+        Serial.printf("Update Success: %uB\n", index+len);
+        Serial.println("Rebooting...");
+    delay(100);
+    ESP.restart();
+      } else {
+        Update.printError(Serial);
+      }
+    }
   });
   
 
-
+//-------------------------------Response to JSON ----------------------------------
 
   server.on("/json", HTTP_GET, [](AsyncWebServerRequest *request){
-long duration = millis();
-   JsonArray digitalValues = doc.createNestedArray("digital");
-   JsonArray timerValues = doc.createNestedArray("manualTimers");
-   JsonArray scheduleValues = doc.createNestedArray("scheduleValues");
+if (request->hasParam("wifilist") && request->getParam("wifilist")->value() =="true") {
+        listNetworks();
+      }
+      else{
+        createJson();
+      }
+      
    String jsonOutput;
-  for (int pin = 0; pin < NUM_RELAYS; pin++) { 
-    // Read the digital input
-    int value = relaySTATE[pin];
-    int timerValue = relayTimers[pin];
-    // Add the value at the end of the array
-    digitalValues.add(value);
-    timerValues.add(timerValues);
-    }
-    scheduleValues.add(schedule);
   serializeJson(doc, jsonOutput);
   
 // Length (with one extra character for the null terminator)
@@ -170,11 +203,24 @@ long duration = millis();
   jsonOutput.toCharArray(char_array, str_len);
    request->send(200, "application/json", char_array);
    doc.clear();
-   //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-   Serial.println("json send time"+millis()-duration);
-  //printLocalTime();
+      
   });
 
+//-------------------------------Response to LOGIN ----------------------------------
+server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    String inputMessage;
+    String inputMessage2;
+    if (request->hasParam(PARAM_INPUT_3) && request->hasParam(PARAM_INPUT_4)) {
+      inputMessage = request->getParam(PARAM_INPUT_3)->value();
+      inputMessage2 = request->getParam(PARAM_INPUT_4)->value();
+      if(inputMessage2==PASSHASH && inputMessage==ROOTUSER){ 
+      logedIn=true;
+        }
+      }
+       request->send(200, "text/plain", "OK");
+  });
+
+//-------------------------------Response to data Update GET------------------------
 
   // Send a GET request to <ESP_IP>/update?relay=<inputMessage>&state=<inputMessage2>
   server.on("/update", HTTP_GET, [] (AsyncWebServerRequest *request) {
@@ -184,31 +230,43 @@ long duration = millis();
     String inputParam2;
    
     // GET input1 value on <ESP_IP>/update?relay=<inputMessage>
-    if (request->hasParam(PARAM_INPUT_1) & request->hasParam(PARAM_INPUT_2)) {
+    if (request->hasParam(PARAM_INPUT_1) && request->hasParam(PARAM_INPUT_2)) {
       inputMessage = request->getParam(PARAM_INPUT_1)->value();
       inputParam = PARAM_INPUT_1;
       inputMessage2 = request->getParam(PARAM_INPUT_2)->value();
       inputParam2 = PARAM_INPUT_2;
       if(RELAY_NO){
-        Serial.print("NO ");
-        digitalWrite(relayGPIOs[inputMessage.toInt()-1], inputMessage2.toInt());
         relaySTATE[inputMessage.toInt()-1] = inputMessage2.toInt();
       }
       else{
-        Serial.print("NC ");
-        digitalWrite(relayGPIOs[inputMessage.toInt()-1], !inputMessage2.toInt());
         relaySTATE[inputMessage.toInt()-1] = !inputMessage2.toInt();
       }
+      outputUpdate();
+       
     }
-    else if (request->hasParam(PARAM_INPUT_3) & request->hasParam(PARAM_INPUT_4)) {
-      inputMessage = request->getParam(PARAM_INPUT_3)->value();
+    
+   else if (request->hasParam(PARAM_INPUT_5)) {
+      inputMessage = request->getParam(PARAM_INPUT_5)->value();
       inputParam = PARAM_INPUT_1;
-      inputMessage2 = request->getParam(PARAM_INPUT_4)->value();
-      inputParam2 = PARAM_INPUT_2;
-      if(inputMessage2==PASSHASH){ 
-      logedIn=true;
-      timermillis = millis();
+      schedule=inputMessage;
+      inputMessage2 = inputMessage.length();         
       }
+      
+      else if (request->hasParam(PARAM_INPUT_6) && request->hasParam(PARAM_INPUT_7)) {
+      inputMessage = request->getParam(PARAM_INPUT_6)->value();
+      inputParam = PARAM_INPUT_1;
+      inputMessage2 = request->getParam(PARAM_INPUT_7)->value();
+      inputParam2 = PARAM_INPUT_2;
+           
+      }
+
+      else if (request->hasParam("ssid") && request->hasParam("password")) {
+      inputMessage = request->getParam("ssid")->value();
+       writeString(10, inputMessage);
+      inputMessage2 = request->getParam("password")->value();
+      writeString(110, inputMessage2);
+      delay(100);
+      ESP.restart();
       
       }
     
@@ -217,23 +275,138 @@ long duration = millis();
       inputParam = "none";
       }
     
-    
-    Serial.println("relay:"+inputMessage + " state:"+inputMessage2);
+    Serial.println("relay/param1:"+inputMessage + " state/param2:"+inputMessage2);
     request->send(200, "text/plain", "OK");
    
   });
+
+  
   // Start server
   server.begin();
    
 }
+//-------------------------------Internal Functions-----------------------------------
+  void outputUpdate(){
+    for(int in=0; in < NUM_RELAYS; in++){
+    if(RELAY_NO){
+      digitalWrite(relayGPIOs[in],relaySTATE[in]);
+      }
+      else
+      {
+      digitalWrite(relayGPIOs[in],!relaySTATE[in]);
+      }
+    } 
+  }
+
+void printLocalTime()
+{
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return;
+  }
+  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+  Serial.println(timeinfo.tm_hour);
+}
+
+long rtcTime(){
+  long actual;
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    actual =0;
+    return actual;
+  }
+  long hour = timeinfo.tm_hour;
+  long minutes = timeinfo.tm_min;
+  long seconds = timeinfo.tm_sec;
+
+  actual =(hour*3600)+(minutes*60)+seconds;
+  
+  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+  Serial.println(timeinfo.tm_hour);
+  
+  return actual;
+  }
+
+void createJson()
+{
+   JsonArray digitalValues = doc.createNestedArray("digital");
+   JsonArray timerValues = doc.createNestedArray("manualTimers");
+   JsonArray scheduleValues = doc.createNestedArray("scheduleValues");
+  
+    // Add the value at the end of the array
+    digitalValues.add(relaySTATE[0]);
+    digitalValues.add(relaySTATE[1]);
+    digitalValues.add(relaySTATE[2]);
+    digitalValues.add(relaySTATE[3]);
+   
+    timerValues.add(relayTimers[0]);
+    timerValues.add(relayTimers[1]);
+    timerValues.add(relayTimers[2]);
+    timerValues.add(relayTimers[3]);
+    scheduleValues.add(schedule);
+}
+
+void writeString(char add,String data)
+{
+  int _size = data.length();
+  int i;
+  for(i=0;i<_size;i++)
+  {
+    EEPROM.write(add+i,data[i]);
+  }
+  EEPROM.write(add+_size,'\0');   //Add termination null character for String Data
+  EEPROM.commit();
+}
+ 
+ 
+String read_String(char add)
+{
+  int i;
+  char data[100]; //Max 100 Bytes
+  int len=0;
+  unsigned char k;
+  k=EEPROM.read(add);
+  while(k != '\0' && len<512)   //Read until null character
+  {    
+    k=EEPROM.read(add+len);
+    data[len]=k;
+    len++;
+  }
+  data[len]='\0';
+  return String(data);
+}
+
+void listNetworks() {
+  JsonArray wifiList = doc.createNestedArray("wifiList");
+  int numSsid = WiFi.scanNetworks();
+  if (numSsid == -1)
+  { 
+   wifiList.add("Couldn't get a wifi connection list");
+  }
+  else{   
+  // print the network number and name for each network found:
+  for (int thisNet = 0; thisNet<numSsid; thisNet++) {
+    String wifiName = WiFi.SSID(thisNet);
+    wifiList.add(wifiName); 
+    }
+  }
+}
+
   
 void loop() {
-  if(logedIn){
+ 
+  /*if(logedIn){
     if(millis()-timermillis >= 10000){
       //logedIn=false;
       }
   //Serial.println(millis());
   }
+  
+  */
+  
+
+  
 for(int e=0; e < NUM_RELAYS; e++){
   if(relaySTATE[e]==true){
     //Serial.println("ligar motor");

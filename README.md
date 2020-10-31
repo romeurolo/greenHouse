@@ -7,6 +7,8 @@ The JSON file that ESP32 serve is simple only contain information about the stat
 In this moment the is no code to receive Jsons, just for now.
 <p></p>
 In terms of security, when you try to connect to the esp32 for the first time a LOGIN page apears and the login operation relies on SHA256 crypto. the hass pass is stored in the ESP32 memory. After the success login the ESP respond the HTML page that have all control possibilities.
+<p></p>
+After Login the page have 5 menus. Actual state, manual mode, schedulle table, manual timming and OTA. 
 
 <h2>Login page</h2>
 
@@ -29,3 +31,11 @@ In terms of security, when you try to connect to the esp32 for the first time a 
 <h2>Manual timer</h2>
 
 ![timer](img/manualTimming.png)
+
+<p></p>
+
+<h2>OTA page</h2>
+
+![ota](img/ota.png)
+
+

@@ -41,6 +41,18 @@ function processResults(error, data, cb) {
     }
 }
 
+function processCardsTimer(error, data, cb) {
+    if (error) {
+    }
+
+    if (data) {
+        for (var x = 0; x < 5; x++) {
+            var milis = (data.manualTimers[x]) / 60000;
+            countDownDate[x] = addMinutes(new Date(), milis);
+        }
+    }
+}
+
 function menuChange(element) {
     $("#main").empty();
     if (String(element.id).slice(4) == "timerTable") {
@@ -49,7 +61,9 @@ function menuChange(element) {
     }
     if (String(element.id).slice(4) == "card1") {
         $("#main").append(cards());
+        jsonRequest(processCardsTimer);
     }
+
     if (String(element.id).slice(4) == "manualButtons") {
         $("#main").append(manualButtons());
     }
@@ -76,10 +90,14 @@ function stopTimer(element) {
 }
 function startTimer(element) {
     var cardId = element.id.slice(10);
-    countDownDate[cardId - 1] = addMinutes(new Date(), $("#timerValue" + cardId).val());
+    var tmin = $("#timerValue" + cardId).val();
+    countDownDate[cardId - 1] = addMinutes(new Date(), tmin);
+
+    miliSecs[cardId - 1] = tmin * 60 * 1000;
+
 
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/update?timer=" + cardId + "&date=" + countDownDate[cardId - 1], true);
+    xhr.open("GET", "/update?timer=" + cardId + "&date=" + miliSecs[cardId - 1], true);
     xhr.send();
 
 }
@@ -124,7 +142,7 @@ function saveSchedule() {
     //Add the id to the list if is selected, if the value has been added, the set dont repeat the entry' 
     $("td").each(function (index) {
         if ($(this).text() == "REGAR") {
-            console.log(String($(this).attr("id")).split("E")[1]);
+            //console.log(String($(this).attr("id")).split("E")[1]);
             scheduleList = scheduleList + String($(this).attr("id"));
         }
     });
@@ -160,14 +178,14 @@ function timerTable() {
     function createRows() {
         var rowHTML = "";
 
-        for (var h = 0; h < 24; h++) {
-            for (var m = 0; m < 50; m = m + 15) {
+        for (var h = 00; h < 24; h++) {
+            for (var m = 00; m < 50; m = m + 15) {
                 rowHTML = rowHTML + ("<tr>"
-                    + "<th class='table-dark' scope='row' style='text-align:center;'>" + h + "H " + m + "m</th>"
-                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:1:" + h + ":" + m + "'></td>"
-                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:2:" + h + ":" + m + "'></td>"
-                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:3:" + h + ":" + m + "'></td>"
-                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:4:" + h + ":" + m + "'></td>"
+                    + "<th class='table-dark' scope='row' style='text-align:center;'>" + (('0' + h)).slice(-2) + "H " + (('0' + m)).slice(-2) + "m</th>"
+                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:1:" + (('0' + h)).slice(-2) + ":" + (('0' + m)).slice(-2) + "'></td>"
+                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:2:" + (('0' + h)).slice(-2) + ":" + (('0' + m)).slice(-2) + "'></td>"
+                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:3:" + (('0' + h)).slice(-2) + ":" + (('0' + m)).slice(-2) + "'></td>"
+                    + "<td style='text-align:center;' onclick='toggleSchedule(this)' id='E:4:" + (('0' + h)).slice(-2) + ":" + (('0' + m)).slice(-2) + "'></td>"
                     + "</tr>");
             }
         }
@@ -300,7 +318,7 @@ function OTA() {
             return xhr;
         },
         success: function (d, s) {
-            console.log('success!');
+            // console.log('success!');
 
             setInterval(function () {
                 $('#prg').html('Rebooting: ' + rebootTime + '%');
@@ -313,7 +331,7 @@ function OTA() {
             }, 100)
         },
         error: function (a, b, c) {
-            console.log('Error!');
+            //console.log('Error!');
         }
     });
 }
@@ -327,6 +345,7 @@ var countDownDate = [0, 0, 0, 0];
 var distance = [0, 0, 0, 0];
 var minutes = [0, 0, 0, 0];
 var seconds = [0, 0, 0, 0];
+var miliSecs = [0, 0, 0, 0];
 var estufa1 = [];
 var estufa2 = [];
 var estufa3 = [];

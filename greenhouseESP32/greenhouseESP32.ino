@@ -50,8 +50,9 @@ bool logedIn = false;
 long timermillis = 0;
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 0;
-const int   daylightOffset_sec = 3600;
+const int   daylightOffset_sec = 0;
 bool shouldReboot = false;
+bool wlConnection = false;
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
@@ -59,7 +60,7 @@ AsyncWebServer server(80);
 // create sever to connect if no network
 //WiFiServer serverAP(80);
 
-
+TaskHandle_t Task1;
 
 // Create Json document
 DynamicJsonDocument doc(4096);
@@ -77,8 +78,6 @@ copy.toCharArray(ssid, 42);
 //copy = read_String(100);
 //copy.toCharArray(password, 110);
  
-  
-
     // Initialize SPIFFS
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
@@ -123,21 +122,32 @@ copy.toCharArray(ssid, 42);
   Serial.println(WiFi.localIP());
 
 if(WiFi.status() == WL_CONNECTED){
-  //Setting RTC
-   //printLocalTime();
-   //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-   //printLocalTime();
+  wlConnection = true;
+   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 }
+
+  xTaskCreatePinnedToCore(
+                    Task1code,   /* Task function. */
+                    "Task1",     /* name of task. */
+                    10000,       /* Stack size of task */
+                    NULL,        /* parameter of the task */
+                    1,           /* priority of the task */
+                    &Task1,      /* Task handle to keep track of created task */
+                    1);          /* pin task to core 0 */                  
+  delay(500); 
+
+
+
   
 
 //-------------------------------Response to main page------------------------
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-   
-    if(logedIn && WiFi.status() == WL_CONNECTED){
+    
+    if(logedIn && wlConnection){
        request->send(SPIFFS, "/control.html","text/html");
       }
-      else if(!logedIn && WiFi.status() == WL_CONNECTED){
+      else if(!logedIn && wlConnection){
          request->send(SPIFFS, "/indexlogin.html","text/html");
         }       
         else{
@@ -194,13 +204,9 @@ if (request->hasParam("wifilist") && request->getParam("wifilist")->value() =="t
       }
       
    String jsonOutput;
-  serializeJson(doc, jsonOutput);
-  
-// Length (with one extra character for the null terminator)
- int str_len = jsonOutput.length() + 1; 
-// Prepare the character array (the buffer) 
- char char_array[str_len];
-  jsonOutput.toCharArray(char_array, str_len);
+   int docSize=doc.memoryUsage();
+   char char_array[docSize];
+   serializeJson(doc,char_array, docSize);
    request->send(200, "application/json", char_array);
    doc.clear();
       
@@ -241,15 +247,16 @@ server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
       else{
         relaySTATE[inputMessage.toInt()-1] = !inputMessage2.toInt();
       }
-      outputUpdate();
-       
+      outputUpdate();    
     }
     
    else if (request->hasParam(PARAM_INPUT_5)) {
       inputMessage = request->getParam(PARAM_INPUT_5)->value();
       inputParam = PARAM_INPUT_1;
       schedule=inputMessage;
-      inputMessage2 = inputMessage.length();         
+      inputMessage2 = inputMessage.length(); 
+     
+    
       }
       
       else if (request->hasParam(PARAM_INPUT_6) && request->hasParam(PARAM_INPUT_7)) {
@@ -257,7 +264,7 @@ server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
       inputParam = PARAM_INPUT_1;
       inputMessage2 = request->getParam(PARAM_INPUT_7)->value();
       inputParam2 = PARAM_INPUT_2;
-           
+      relayTimers[inputMessage.toInt()-1] = millis()+inputMessage2.toInt();
       }
 
       else if (request->hasParam("ssid") && request->hasParam("password")) {
@@ -267,7 +274,6 @@ server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
       writeString(110, inputMessage2);
       delay(100);
       ESP.restart();
-      
       }
     
     else {
@@ -279,8 +285,7 @@ server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "OK");
    
   });
-
-  
+ 
   // Start server
   server.begin();
    
@@ -309,25 +314,6 @@ void printLocalTime()
   Serial.println(timeinfo.tm_hour);
 }
 
-long rtcTime(){
-  long actual;
-  struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
-    actual =0;
-    return actual;
-  }
-  long hour = timeinfo.tm_hour;
-  long minutes = timeinfo.tm_min;
-  long seconds = timeinfo.tm_sec;
-
-  actual =(hour*3600)+(minutes*60)+seconds;
-  
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-  Serial.println(timeinfo.tm_hour);
-  
-  return actual;
-  }
-
 void createJson()
 {
    JsonArray digitalValues = doc.createNestedArray("digital");
@@ -339,11 +325,11 @@ void createJson()
     digitalValues.add(relaySTATE[1]);
     digitalValues.add(relaySTATE[2]);
     digitalValues.add(relaySTATE[3]);
-   
-    timerValues.add(relayTimers[0]);
-    timerValues.add(relayTimers[1]);
-    timerValues.add(relayTimers[2]);
-    timerValues.add(relayTimers[3]);
+    long actMillis=millis();
+    timerValues.add(relayTimers[0]-actMillis);
+    timerValues.add(relayTimers[1]-actMillis);
+    timerValues.add(relayTimers[2]-actMillis);
+    timerValues.add(relayTimers[3]-actMillis);
     scheduleValues.add(schedule);
 }
 
@@ -385,7 +371,7 @@ void listNetworks() {
    wifiList.add("Couldn't get a wifi connection list");
   }
   else{   
-  // print the network number and name for each network found:
+    
   for (int thisNet = 0; thisNet<numSsid; thisNet++) {
     String wifiName = WiFi.SSID(thisNet);
     wifiList.add(wifiName); 
@@ -393,20 +379,74 @@ void listNetworks() {
   }
 }
 
+void Task1code( void * pvParameters ){
+  for(;;){
+    
+  if(schedule !=""){
+ 
+  struct tm timeinfo;
+  getLocalTime(&timeinfo);
+  long hour = timeinfo.tm_hour;
+  long minutes = timeinfo.tm_min;
+/*
+  Serial.println("time");
+  Serial.println(hour);
+  Serial.println(minutes);
+*/
+  for(int s =0; s < schedule.length()/9; s++){
+    long segment;
+    segment = (schedule.substring((s*9)+2,(s*9)+3)).toInt();
+    relaySTATE[0]=0;
+    relaySTATE[1]=0;
+    relaySTATE[2]=0;
+    relaySTATE[3]=0;
+     segment = (schedule.substring((s*9)+4,(s*9)+6)).toInt();
+   if(segment==hour){
+    segment = (schedule.substring((s*9)+7,(s*9)+9)).toInt();
+    if(segment <= minutes && (segment + 15) > minutes){ 
+      segment = (schedule.substring((s*9)+2,(s*9)+3)).toInt();
+      relaySTATE[segment]=1;
+        }
+      }
+    }
+    
+  }
+  else{
+    relaySTATE[0]=0;
+    relaySTATE[1]=0;
+    relaySTATE[2]=0;
+    relaySTATE[3]=0;
+    outputUpdate();
+    }
+  } 
+}
+
   
 void loop() {
- 
+int actualMillis = millis();
+for(int t=0; t < NUM_RELAYS; t++){
+  if(actualMillis > relayTimers[t]){
+    relayTimers[t]=0;
+    relaySTATE[t]=0;
+   }
+   else{
+    relaySTATE[t]=1;
+    }
+  }
+outputUpdate();
+
+
+
+
+
   /*if(logedIn){
     if(millis()-timermillis >= 10000){
       //logedIn=false;
       }
   //Serial.println(millis());
   }
-  
   */
-  
-
-  
+   
 for(int e=0; e < NUM_RELAYS; e++){
   if(relaySTATE[e]==true){
     //Serial.println("ligar motor");

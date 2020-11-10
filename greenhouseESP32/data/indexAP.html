@@ -20,6 +20,12 @@
 
     <p></p>
     <p></p>
+    <form method="POST" action="#" enctype="multipart/form-data" id="upload_form">
+        <label id="ota">Update firmware:</label><br>
+        <input class="form-control-file " type="file" name="update">
+        <br><br>
+        <button type="button" onclick="OTA()" class="btn btn-primary">Update</button>
+    </form>
 
     <script>
         function check(form) {
@@ -77,6 +83,21 @@
             //element.appendChild(node);
             element.appendChild(para);
 
+        }
+
+        function OTA() {
+
+            var xmlhttp = new XMLHttpRequest();
+            var url = "/OTA";
+            var form = document.getElementById("upload_form")
+            var data = new FormData(form);
+            xmlhttp.open("POST", url, true);
+            xmlhttp.onreadystatechange = function () { // Chama a função quando o estado mudar.
+                if (this.readyState === XMLHttpRequest.DONE && this.status === 200) {
+                    // Requisição finalizada. Faça o processamento aqui.
+                }
+            }
+            xmlhttp.send(data);
         }
 
         document.getElementById("fname").addEventListener("load", jsonreq());

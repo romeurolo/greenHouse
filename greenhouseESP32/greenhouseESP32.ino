@@ -9,22 +9,19 @@
 #include "Update.h"
 #include <EEPROM.h>
 
-
-
 // Set to true to define Relay as Normally Open (NO)
 #define RELAY_NO    true
 
 // Set number of relays
-#define NUM_RELAYS  5
+#define NUM_RELAYS  4
 
 void writeString(char add,String data);
 String read_String(char add);
 
-
 // Assign each GPIO to a relay
-int relayGPIOs[NUM_RELAYS] = {2, 26, 27, 25, 33};
-int relaySTATE[NUM_RELAYS] = {0,0,0,0,0};
-long relayTimers[NUM_RELAYS] ={0,0,0,0,0};
+int relayGPIOs[NUM_RELAYS] = {2, 26, 27, 25};
+int relaySTATE[NUM_RELAYS] = {0,0,0,0};
+long relayTimers[NUM_RELAYS] ={0,0,0,0};
 String schedule="";
 
 
@@ -42,8 +39,6 @@ const char* PARAM_INPUT_4 = "password";
 const char* PARAM_INPUT_5 = "timming";
 const char* PARAM_INPUT_6 = "timer";
 const char* PARAM_INPUT_7 = "date";
-
-
 const char* PASSHASH = "4a7f6f76bbe95876c2fde2d8693ed8c3aca8d5a85a0df6e7cb0fd7b2751be915";
 const char* ROOTUSER = "romeurolo";
 bool logedIn = false;
@@ -57,43 +52,41 @@ bool wlConnection = false;
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
-// create sever to connect if no network
-//WiFiServer serverAP(80);
-
 TaskHandle_t Task1;
 
 // Create Json document
 DynamicJsonDocument doc(4096);
 
-// -----------------------separation html side ----------------------
+// -----------------------setup function ----------------------
 
 void setup(){
   // Serial port for debugging purposes
   Serial.begin(115200);
-  EEPROM.begin(512);
-//-------------------------Read ssid and wifi password from EEPROM----------------
-String copy;
-copy = read_String(10);
-copy.toCharArray(ssid, 42);
-//copy = read_String(100);
-//copy.toCharArray(password, 110);
- 
-    // Initialize SPIFFS
+  
+ // Initialize SPIFFS
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
   }
+//read ssid and pass from spiffs
+String copy;
+copy=readFile("/ssid.txt");
+copy.toCharArray(ssid, 32);
+copy=readFile("/pass.txt");
+copy.toCharArray(password, 32);
+//Read schedule from data.txt
+schedule=readFile("/data.txt");
 
   // Set all relays to off when the program starts - if set to Normally Open (NO), the relay is off when you set the relay to HIGH
-  for(int i=1; i<=NUM_RELAYS; i++){
-    pinMode(relayGPIOs[i-1], OUTPUT);
+  for(int i=0; i<NUM_RELAYS; i++){
+    pinMode(relayGPIOs[i], OUTPUT);
     if(RELAY_NO){
-      digitalWrite(relayGPIOs[i-1], LOW);
-      relaySTATE[i-1] = LOW;
+      digitalWrite(relayGPIOs[i], LOW);
+      relaySTATE[i] = LOW;
     }
     else{
-      digitalWrite(relayGPIOs[i-1], HIGH);
-      relaySTATE[i-1] = HIGH;
+      digitalWrite(relayGPIOs[i], HIGH);
+      relaySTATE[i] = HIGH;
     }
   }
   
@@ -117,7 +110,6 @@ copy.toCharArray(ssid, 42);
   Serial.println("Server started");
     }
 
-
   // Print ESP32 Local IP Address
   Serial.println(WiFi.localIP());
 
@@ -133,12 +125,7 @@ if(WiFi.status() == WL_CONNECTED){
                     NULL,        /* parameter of the task */
                     1,           /* priority of the task */
                     &Task1,      /* Task handle to keep track of created task */
-                    1);          /* pin task to core 0 */                  
-  delay(500); 
-
-
-
-  
+                    1);          /* pin task to core 0 */                   
 
 //-------------------------------Response to main page------------------------
   // Route for root / web page
@@ -254,9 +241,9 @@ server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
       inputMessage = request->getParam(PARAM_INPUT_5)->value();
       inputParam = PARAM_INPUT_1;
       schedule=inputMessage;
+      writeFile("/data.txt",inputMessage);      
       inputMessage2 = inputMessage.length(); 
      
-    
       }
       
       else if (request->hasParam(PARAM_INPUT_6) && request->hasParam(PARAM_INPUT_7)) {
@@ -268,10 +255,11 @@ server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
       }
 
       else if (request->hasParam("ssid") && request->hasParam("password")) {
+      
       inputMessage = request->getParam("ssid")->value();
-       writeString(10, inputMessage);
+       writeFile("/ssid.txt",inputMessage);
       inputMessage2 = request->getParam("password")->value();
-      writeString(110, inputMessage2);
+      writeFile("/pass.txt",inputMessage2);
       delay(100);
       ESP.restart();
       }
@@ -283,7 +271,6 @@ server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
     
     Serial.println("relay/param1:"+inputMessage + " state/param2:"+inputMessage2);
     request->send(200, "text/plain", "OK");
-   
   });
  
   // Start server
@@ -302,17 +289,6 @@ server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
       }
     } 
   }
-
-void printLocalTime()
-{
-  struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-    return;
-  }
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-  Serial.println(timeinfo.tm_hour);
-}
 
 void createJson()
 {
@@ -333,35 +309,42 @@ void createJson()
     scheduleValues.add(schedule);
 }
 
-void writeString(char add,String data)
-{
-  int _size = data.length();
-  int i;
-  for(i=0;i<_size;i++)
-  {
-    EEPROM.write(add+i,data[i]);
+
+void writeFile(String fileDir, String input){
+  File file = SPIFFS.open(fileDir, "w");
+        if(!file){
+          // File not found
+          Serial.println("Failed to open test file");
+          return;
+            } else {
+            file.println(input);
+            file.close();
+            }
   }
-  EEPROM.write(add+_size,'\0');   //Add termination null character for String Data
-  EEPROM.commit();
-}
- 
- 
-String read_String(char add)
-{
-  int i;
-  char data[100]; //Max 100 Bytes
-  int len=0;
-  unsigned char k;
-  k=EEPROM.read(add);
-  while(k != '\0' && len<512)   //Read until null character
-  {    
-    k=EEPROM.read(add+len);
-    data[len]=k;
-    len++;
+String readFile(String fileDir){
+  String output;
+  File file = SPIFFS.open(fileDir, "r");
+        if(!file){
+          // File not found
+          Serial.println("Failed to open data file");          
+          return "";
+            } else {
+                byte fbyte;
+                char fchar;
+              while(file.available()){
+                fbyte= file.read();
+                if(fbyte != -1){
+                  fchar = char(fbyte);
+                output += fchar;
+                Serial.print(fchar);
+                  }
+                }
+            file.close();
+            int l = output.length();
+            output.remove(l-1);
+            return output;
+            }
   }
-  data[len]='\0';
-  return String(data);
-}
 
 void listNetworks() {
   JsonArray wifiList = doc.createNestedArray("wifiList");
@@ -380,10 +363,13 @@ void listNetworks() {
 }
 
 void Task1code( void * pvParameters ){
+   long lastMillis=0;
   for(;;){
+  long actualMillis = millis();
+  
     
-  if(schedule !=""){
- 
+  if(schedule !="" && lastMillis< actualMillis){
+  lastMillis=actualMillis+1000;
   struct tm timeinfo;
   getLocalTime(&timeinfo);
   long hour = timeinfo.tm_hour;
@@ -401,14 +387,15 @@ void Task1code( void * pvParameters ){
     relaySTATE[2]=0;
     relaySTATE[3]=0;
      segment = (schedule.substring((s*9)+4,(s*9)+6)).toInt();
-   if(segment==hour){
-    segment = (schedule.substring((s*9)+7,(s*9)+9)).toInt();
-    if(segment <= minutes && (segment + 15) > minutes){ 
-      segment = (schedule.substring((s*9)+2,(s*9)+3)).toInt();
-      relaySTATE[segment]=1;
+      if(segment==hour){
+      segment = (schedule.substring((s*9)+7,(s*9)+9)).toInt();
+        if(segment <= minutes && (segment + 15) > minutes){ 
+        segment = (schedule.substring((s*9)+2,(s*9)+3)).toInt();
+        relaySTATE[segment]=1;
         }
       }
     }
+    outputUpdate();
     
   }
   else{
@@ -434,10 +421,6 @@ for(int t=0; t < NUM_RELAYS; t++){
     }
   }
 outputUpdate();
-
-
-
-
 
   /*if(logedIn){
     if(millis()-timermillis >= 10000){

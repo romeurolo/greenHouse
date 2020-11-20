@@ -210,7 +210,6 @@ function updateShedule(error, data, cb) {
     if (data && data.scheduleValues[0]) {
         var schedule = data.scheduleValues[0].split("E");
         for (var e = 1; e < schedule.length; e++) {
-            console.log(typeof (schedule[e]));
             var element = document.getElementById("E" + schedule[e]);
             element.classList.toggle("bg-success");
             element.innerHTML = "REGAR";

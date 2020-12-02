@@ -25,6 +25,9 @@ long relayTimers[NUM_RELAYS] ={0,0,0,0};
 String schedule="";
 
 
+
+String softwareVersion ="v 1.0";
+
 // Replace with your network credentials
 char ssid[32] ="";
 char password[32] ="";
@@ -37,8 +40,8 @@ const char* PARAM_INPUT_2 = "state";
 const char* PARAM_INPUT_5 = "timming";
 const char* PARAM_INPUT_6 = "timer";
 const char* PARAM_INPUT_7 = "date";
-const char* PASSHASH = "4a7f6f76bbe95876c2fde2d8693ed8c3aca8d5a85a0df6e7cb0fd7b2751be915";
-const char* ROOTUSER = "romeurolo";
+const char* PASSHASH = "e7d3e769f3f593dadcb8634cc5b09fc90dd3a61c4a06a79cb0923662fe6fae6b";
+const char* ROOTUSER = "Administrator";
 bool logedIn = false;
 long timermillis = 0;
 const char* ntpServer = "pool.ntp.org";
@@ -93,8 +96,8 @@ schedule=readFile("/data.txt");
   WiFi.begin(ssid, password);
   int atempt = 0;
  
-  while (WiFi.status() != WL_CONNECTED && atempt <10) { 
-    delay(1000);
+  while (WiFi.status() != WL_CONNECTED && atempt <20) { 
+    delay(2000);
     atempt++;
     Serial.println("Connecting to WiFi..");
   }  
@@ -142,7 +145,7 @@ if(WiFi.status() == WL_CONNECTED){
       }
     
     if(logedIn && wlConnection){
-       request->send(SPIFFS, "/control.html","text/html");
+       request->send(SPIFFS, "/control.html", String(), false, processor);
       }
       else if(!logedIn && wlConnection){
          request->send(SPIFFS, "/indexlogin.html","text/html");
@@ -314,6 +317,16 @@ if (request->hasParam("wifilist") && request->getParam("wifilist")->value() =="t
       }
     } 
   }
+  
+  String processor(const String& var)
+{
+  String f;
+  if(var == "TEMPLATE")
+  f = ("var softwareVersion ='" + softwareVersion + "';");
+   
+  return f;
+}
+
  
 void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!index) {
@@ -380,12 +393,10 @@ String readFile(String fileDir){
                 if(fbyte != -1){
                   fchar = char(fbyte);
                 output += fchar;
-                Serial.print(fchar);
+                //Serial.print(fchar);
                   }
                 }
             file.close();
-            int l = output.length();
-            //output.remove(l-1);
             return output;
             }
   }

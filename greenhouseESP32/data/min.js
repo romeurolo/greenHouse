@@ -352,6 +352,7 @@ function createUpdate() {
         "<div class='card m-3' style='width: 25rem;'>" +
         "<div class='card-body'>" +
         "<h5 class='card-title text-center'>Update software</h5>" +
+        "<p class='card-text'  ><h6 style='color:blue'> Current Firmware:" + softwareVersion + "</h6></p > " +
         "<p class='card-text' id = 'prg' > progress: 0 %</p > " +
         "<div class='progress' > " +
         "<div class='progress-bar progress-bar-striped bg-success' role = 'progressbar'" +
@@ -430,4 +431,5 @@ var estufa3 = [];
 var estufa4 = [];
 var greenHouseTimming = [estufa1, estufa2, estufa3, estufa4];
 var rebootTime = 0;
+
 

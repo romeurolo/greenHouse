@@ -34,8 +34,6 @@ const char *passwordAP = "";
 
 const char* PARAM_INPUT_1 = "relay";
 const char* PARAM_INPUT_2 = "state";
-const char* PARAM_INPUT_3 = "username";
-const char* PARAM_INPUT_4 = "password";
 const char* PARAM_INPUT_5 = "timming";
 const char* PARAM_INPUT_6 = "timer";
 const char* PARAM_INPUT_7 = "date";
@@ -60,6 +58,7 @@ DynamicJsonDocument doc(4096);
 // -----------------------setup function ----------------------
 
 void setup(){
+  
   // Serial port for debugging purposes
   Serial.begin(115200);
   
@@ -130,6 +129,17 @@ if(WiFi.status() == WL_CONNECTED){
 //-------------------------------Response to main page------------------------
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+
+    String inputMessage;
+    String inputMessage2;
+    
+    if (logedIn == false && request->hasParam("username") && request->hasParam("password")) {
+      inputMessage = request->getParam("username")->value();
+      inputMessage2 = request->getParam("password")->value();
+      if(inputMessage2==PASSHASH && inputMessage==ROOTUSER){ 
+      logedIn=true;
+        }
+      }
     
     if(logedIn && wlConnection){
        request->send(SPIFFS, "/control.html","text/html");
@@ -141,12 +151,37 @@ if(WiFi.status() == WL_CONNECTED){
           request->send(SPIFFS, "/indexAP.html","text/html");
           }
   });
-  
-  //-------------------------------Response to javascript------------------------
-  server.on("/min.js", HTTP_GET, [](AsyncWebServerRequest *request){
-  request->send(SPIFFS, "/min.js","text/javascript");
+
+    //-------------------------------Response to javascript------------------------
+  server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request){
+  request->send(SPIFFS, "/favicon.ico","image/x-icon");
 });
 
+//---------------------------------Response to files read in spiffs----------------------
+// Serve files in directory "/" when request url starts with "/file"
+server.serveStatic("/file", SPIFFS, "/");
+
+//---------------------------------Response to files delete in spiffs----------------------
+ server.on("/file", HTTP_DELETE, [](AsyncWebServerRequest *request){
+  String url =request->url();
+  url=url.substring(5);
+    //Serial.println(url);
+    char path[url.length()+1];
+    url.toCharArray(path, url.length()+1);
+    int code = deleteFile(SPIFFS, path);
+    if(code == 204){
+      request->send(204, "text/plain", "DELETED");}
+    else{
+   request->send(410, "text/plain", "File not found / Forbidden");
+    }
+ });
+
+ //---------------------------------Response to files create in spiffs----------------------
+
+ server.on("/file", HTTP_POST, [](AsyncWebServerRequest *request){
+        request->send(200);
+      }, handleUpload);
+           
 //-------------------------------Response to OTA Update------------------------
   
   server.on("/OTA", HTTP_POST, [](AsyncWebServerRequest *request){
@@ -186,9 +221,12 @@ if(WiFi.status() == WL_CONNECTED){
 if (request->hasParam("wifilist") && request->getParam("wifilist")->value() =="true") {
         listNetworks();
       }
+      else if(request->hasParam("filelist") && request->getParam("filelist")->value() =="true"){
+        listDirectorie(SPIFFS, "/", 0);
+      }
       else{
         createJson();
-      }
+        }
       
    String jsonOutput;
    int docSize=doc.memoryUsage();
@@ -197,20 +235,6 @@ if (request->hasParam("wifilist") && request->getParam("wifilist")->value() =="t
    request->send(200, "application/json", char_array);
    doc.clear();
       
-  });
-
-//-------------------------------Response to LOGIN ----------------------------------
-server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
-    String inputMessage;
-    String inputMessage2;
-    if (request->hasParam(PARAM_INPUT_3) && request->hasParam(PARAM_INPUT_4)) {
-      inputMessage = request->getParam(PARAM_INPUT_3)->value();
-      inputMessage2 = request->getParam(PARAM_INPUT_4)->value();
-      if(inputMessage2==PASSHASH && inputMessage==ROOTUSER){ 
-      logedIn=true;
-        }
-      }
-       request->send(200, "text/plain", "OK");
   });
 
 //-------------------------------Response to data Update GET------------------------
@@ -261,6 +285,7 @@ server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
       inputMessage2 = request->getParam("password")->value();
       writeFile("/pass.txt",inputMessage2);
       delay(100);
+       request->send(200, "text/plain", "OK");
       ESP.restart();
       }
     
@@ -289,6 +314,24 @@ server.on("/login", HTTP_GET, [] (AsyncWebServerRequest *request) {
       }
     } 
   }
+ 
+void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  if (!index) {
+    // open the file on first call and store the file handle in the request object
+    request->_tempFile = SPIFFS.open("/" + filename, "w");
+  }
+
+  if (len) {
+    // stream the incoming chunk to the opened file
+    request->_tempFile.write(data, len);
+  }
+
+  if (final) {
+    // close the file handle as the upload is now done
+    request->_tempFile.close();
+    request->redirect("/");
+  }
+}
 
 void createJson()
 {
@@ -317,10 +360,11 @@ void writeFile(String fileDir, String input){
           Serial.println("Failed to open test file");
           return;
             } else {
-            file.println(input);
+            file.print(input);
             file.close();
             }
   }
+  
 String readFile(String fileDir){
   String output;
   File file = SPIFFS.open(fileDir, "r");
@@ -341,10 +385,48 @@ String readFile(String fileDir){
                 }
             file.close();
             int l = output.length();
-            output.remove(l-1);
+            //output.remove(l-1);
             return output;
             }
   }
+
+void listDirectorie(fs::FS &fs, const char * dirname, uint8_t levels){
+    JsonArray fileListName = doc.createNestedArray("fileName");
+    JsonArray fileListSize = doc.createNestedArray("fileSize");
+    File root = fs.open(dirname);
+    if(!root){
+        //Serial.println("- failed to open directory");
+        return;
+    }
+    if(!root.isDirectory()){
+        //Serial.println(" - not a directory");
+        return;
+    }
+    File file = root.openNextFile();
+    while(file){
+        if(file.isDirectory()){
+            if(levels){
+                listDirectorie(fs, file.name(), levels -1);
+            }
+        } else {
+            fileListName.add(String(file.name()));
+            fileListSize.add(String(file.size()));  
+        }
+        file = root.openNextFile();
+    }
+}
+
+int deleteFile(fs::FS &fs, const char * path){
+    Serial.printf("Deleting file: %s\r\n", path);
+    if(fs.remove(path)){
+        Serial.println("- file deleted");
+        return 204;
+    } else {
+        Serial.println("- delete failed");
+        return 410;
+    }
+}
+
 
 void listNetworks() {
   JsonArray wifiList = doc.createNestedArray("wifiList");

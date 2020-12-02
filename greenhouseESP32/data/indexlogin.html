@@ -38,7 +38,7 @@
         function check(form) {
             var hash = CryptoJS.SHA256(form.pwd.value);
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", "/login?username=" + form.userid.value + "&password=" + hash, true);
+            xhr.open("GET", "/?username=" + form.userid.value + "&password=" + hash, true);
             xhr.send();
             setTimeout(() => { window.location.reload(); }, 500);
         }

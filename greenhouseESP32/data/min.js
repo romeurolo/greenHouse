@@ -4,27 +4,27 @@ function toggleCheckbox(element) {
     else { xhr.open("GET", "/update?relay=" + element.id + "&state=0", true); }
     xhr.send();
 }
-function jsonRequest(cb1, cb2) {
+function jsonRequest(cb1, jsonURL) {
     $.ajax({
-        url: "/json",
+        url: jsonURL,
         timeout: 2000,
         type: 'GET',
         dataType: 'json',
         success: function (results) {
-            cb1(null, results, cb2);
+            cb1(null, results);
             $("#connectionStatus").empty();
             $("#connectionStatus").append("<a class='nav-link disabled'>Conected <span class='dotGreen'></span></a>");
+
         },
         error: function (request, statusText, httpError) {
-            cb1(httpError || statusText, cb2), null;
+            cb1((httpError || statusText), null);
             $("#connectionStatus").empty();
             $("#connectionStatus").append("<a class='nav-link disabled'>Disconected <span class='dotRed'></span></a>");
         }
     });
-
 }
 
-function processResults(error, data, cb) {
+function processResults(error, data) {
     if (error) {
         if ($("#" + e).length == 1) {
             $("#" + e).attr("checked", false);
@@ -41,7 +41,45 @@ function processResults(error, data, cb) {
     }
 }
 
-function processCardsTimer(error, data, cb) {
+function processFileList(error, data) {
+    var fileListData = "0";
+    if (error) {
+        fileListData = "<tr>"
+            + "<th  scope='row' style='text-align:center;'>No files</th>"
+            + "<td style='text-align:center; id='file1'> 0</td>"
+            + "<td style='text-align:center; id='file1'>-</td> "
+            + "</tr>";
+
+    }
+    if (data) {
+        fileListData = "";
+        for (var x = 0; x < data.fileName.length; x++) {
+            fileListData = fileListData + "<tr>"
+                + "<th  scope='row' style='text-align:center;'>"
+                + "<a href='/file"
+                + data.fileName[x]
+                + "'class='badge badge-success'>"
+                + data.fileName[x]
+                + "</a>"
+                + "</th>"
+                + "<td style='text-align:center; id='file1'>"
+                + data.fileSize[x]
+                + "</td>"
+                + "<td style='text-align:center; id='file1'>"
+                + "<button type='button' onclick='deleteFile(this)'"
+                + "class='btn btn-lg btn-danger mx-auto' id='delete" + data.fileName[x] + "'>"
+                + " Delete</button>"
+                + "</td> "
+                + "</tr>";
+
+            //console.log("NAME: " + data.fileName[x] + " SIZE: " + data.fileSize[x]);
+        }
+
+    }
+    $("#main").append(createSPIFFS(fileListData));
+}
+
+function processCardsTimer(error, data) {
     if (error) {
     }
 
@@ -52,18 +90,32 @@ function processCardsTimer(error, data, cb) {
         }
     }
 }
+function deleteFile(element) {
+    var path;
+    path = String(element.id).slice(6);
+    var xhr = new XMLHttpRequest();
+    xhr.open("DELETE", ("/file" + path), true);
+    xhr.send();
+
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4 && xhr.status == 204) {
+            window.alert(path + " deleted");
+            $("#main").empty();
+            jsonRequest(processFileList, "/json?filelist=true");
+        }
+    }
+}
 
 function menuChange(element) {
     $("#main").empty();
     if (String(element.id).slice(4) == "timerTable") {
         $("#main").append(timerTable());
-        jsonRequest(updateShedule);
+        jsonRequest(updateShedule, "/json");
     }
     if (String(element.id).slice(4) == "card1") {
         $("#main").append(cards());
-        jsonRequest(processCardsTimer);
+        jsonRequest(processCardsTimer, "/json");
     }
-
     if (String(element.id).slice(4) == "manualButtons") {
         $("#main").append(manualButtons());
     }
@@ -72,6 +124,10 @@ function menuChange(element) {
     }
     if (String(element.id).slice(4) == "Update") {
         $("#main").append(createUpdate());
+    }
+
+    if (String(element.id).slice(4) == "SPIFFS") {
+        jsonRequest(processFileList, "/json?filelist=true");
     }
 }
 
@@ -237,6 +293,27 @@ function cards() {
     cards += "</div>";
     return cards;
 }
+function createSPIFFS(fileList) {
+    var list = "<div class='col-sm-12 col-lg-12 mx-my-5' id='SPIFFS'>"
+        + "<table class='table table-bordered'>"
+        + "<thead class='thead-dark'>"
+        + "<tr>"
+        + "<th scope='col' style='text-align:center;'>File name <br> (Click in the file to download)</th>"
+        + "<th scope='col' style='text-align:center;'>Size </th>"
+        + "<th scope='col' style='text-align:center;'>Delete </th>"
+        + "</tr>"
+        + "</thead>"
+        + "<tbody>"
+        + fileList
+        + "</tbody >"
+        + "</table >"
+        + "</div > "
+        + "<form method='POST' action='/file' enctype='multipart/form-data'>"
+        + "<input type='file' name='data'>"
+        + "<button type='submit' class='btn btn-primary'>Update</button>";
+
+    return list;
+}
 
 function createCard(number) {
 
@@ -337,9 +414,9 @@ function OTA() {
     });
 }
 
-setInterval(function () { if ($("#1").length == 1) { jsonRequest(processResults); } }, 550);
+setInterval(function () { if ($("#1").length == 1) { jsonRequest(processResults, "/json"); } }, 550);
 setInterval(timer, 1000);
-document.getElementById("connectionStatus").addEventListener("load", jsonRequest(processResults));
+document.getElementById("connectionStatus").addEventListener("load", jsonRequest(processResults, "/json"));
 
 
 var countDownDate = [0, 0, 0, 0];
@@ -353,3 +430,4 @@ var estufa3 = [];
 var estufa4 = [];
 var greenHouseTimming = [estufa1, estufa2, estufa3, estufa4];
 var rebootTime = 0;
+

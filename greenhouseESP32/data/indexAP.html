@@ -32,7 +32,7 @@
 
             if (form.ssid.value != "") {
                 var xhr = new XMLHttpRequest();
-                xhr.open("GET", "/update?ssid=" + form.ssid.value + "&password=" + form.pswd.value, true);
+                xhr.open("GET", "/?ssid=" + form.ssid.value + "&password=" + form.pswd.value, true);
                 xhr.send();
                 //setTimeout(() => { window.location.reload(); }, 500);
                 alert("Please conect to wifi");
@@ -43,7 +43,7 @@
         }
         function jsonreq() {
             var xmlhttp = new XMLHttpRequest();
-            var url = "/json?wifilist=true";
+            var url = "/json?data=wifilist";
 
             xmlhttp.onreadystatechange = function () {
                 document.getElementById("fname").remove();
@@ -61,7 +61,6 @@
                     if (myArr.wifiList.length > 0) {
                         optionHTML = "";
                         for (var t = 0; t < myArr.wifiList.length; t++) {
-                            console.log(myArr.wifiList[t])
                             optionHTML += "<option value='" + myArr.wifiList[t] + "'>" + myArr.wifiList[t] + "</option>";
                         }
                     }
